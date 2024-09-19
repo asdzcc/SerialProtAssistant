@@ -13,15 +13,15 @@ namespace SerialProtAssistant2
 {
     public partial class Form1 : Form
     {
-        private bool isSerialPortOpen = false;
-        private bool isStopRec = true;
-        private bool isFramHead = false;
+        private bool _isSerialPortOpen = false;
+        private bool _isStopRec = true;
+        private bool _isFramHead = false;
         private List<byte> recBuffer = new List<byte>(); //接收数据的缓存
         private List<byte> sendBuffer = new List<byte>(); //发送数据的缓存
         private Queue<byte> queueBuffer = null; //数据帧解析队列
-        private int recCount = 0;
-        private int sendCount = 0;
-        private int frameLength = 0;
+        private int _recCount = 0;
+        private int _sendCount = 0;
+        private int _frameLength = 0;
 
         //事件传值
         public event Action<byte[]> TransmitData;
@@ -75,13 +75,13 @@ namespace SerialProtAssistant2
 
                     serialPort1.DataBits = Convert.ToInt32(cmb_databit.Text);
                     serialPort1.Open();
-                    isSerialPortOpen = true;
+                    _isSerialPortOpen = true;
                     btn_openserialport.Text = "关闭串口";
                 }
                 else
                 {
                     serialPort1.Close();
-                    isSerialPortOpen = false;
+                    _isSerialPortOpen = false;
                     btn_openserialport.Text = "打开串口";
                 }
             }
@@ -145,13 +145,13 @@ namespace SerialProtAssistant2
                 return;
             }
             serialPort1.Write(data, 0, data.Length);
-            sendCount += data.Length;
-            status_send_count.Text = sendCount.ToString();
+            _sendCount += data.Length;
+            status_send_count.Text = _sendCount.ToString();
         }
 
         private void btn_send_Click(object sender, EventArgs e)
         {
-            if (!string.IsNullOrEmpty(rtxt_send.Text) && isSerialPortOpen)
+            if (!string.IsNullOrEmpty(rtxt_send.Text) && _isSerialPortOpen)
             {
                 SendData();
             }
@@ -169,8 +169,8 @@ namespace SerialProtAssistant2
             //将准备好的数据中的指定数量的字节写入串行端口
             byte[] dataTemp = sendBuffer.ToArray();
             serialPort1.Write(dataTemp, 0, dataTemp.Length);
-            sendCount += sendBuffer.Count;
-            status_send_count.Text = sendCount.ToString();
+            _sendCount += sendBuffer.Count;
+            status_send_count.Text = _sendCount.ToString();
         }
 
         /// <summary>
@@ -181,7 +181,7 @@ namespace SerialProtAssistant2
         private void serialPort1_DataReceived(object sender, SerialDataReceivedEventArgs e)
         {
             //点击了接收区暂停按钮就直接返回，停止接收数据
-            if (!isStopRec)
+            if (!_isStopRec)
                 return;
             //serialPort1.BytesToRead 获取接收缓冲区中数据的字节数
             byte[] dataTemp = new byte[serialPort1.BytesToRead];
@@ -189,7 +189,7 @@ namespace SerialProtAssistant2
             serialPort1.Read(dataTemp, 0, dataTemp.Length);
             //将读取到的数据缓存起来
             recBuffer.AddRange(dataTemp);
-            recCount += dataTemp.Length;
+            _recCount += dataTemp.Length;
 
             //向子窗体发生数据
             TransmitData?.Invoke(dataTemp);
@@ -199,7 +199,7 @@ namespace SerialProtAssistant2
                 new Action(() =>
                 {
                     //界面显示已接收的数据量
-                    status_rec_count.Text = recCount.ToString();
+                    status_rec_count.Text = _recCount.ToString();
 
                     //是否解析数据帧
                     if (!cb_jx_useDataFrameRec.Checked)
@@ -227,7 +227,7 @@ namespace SerialProtAssistant2
                         }
 
                         // 解析获取帧头 0x7f是协议自定义的帧头
-                        if (!isFramHead)
+                        if (!_isFramHead)
                         {
                             foreach (byte item in queueBuffer.ToArray())
                             {
@@ -239,14 +239,14 @@ namespace SerialProtAssistant2
                                 }
                                 else
                                 {
-                                    isFramHead = true;
+                                    _isFramHead = true;
                                     Debug.WriteLine("0x7f is recived !!");
                                     break;
                                 }
                             }
                         }
 
-                        if (isFramHead)
+                        if (_isFramHead)
                         {
                             if (queueBuffer.Count >= 2)
                             {
@@ -258,13 +258,13 @@ namespace SerialProtAssistant2
                                     $"frame lenth ={String.Format("{0:X2}", queueBuffer.ToArray()[1])}"
                                 );
 
-                                frameLength = queueBuffer.ToArray()[1]; //数据中第二个字节表示数据长度
+                                _frameLength = queueBuffer.ToArray()[1]; //数据中第二个字节表示数据长度
 
                                 // 一帧完整的数据长度判断，不代表数据是正确的
-                                if (queueBuffer.Count >= 1 + 1 + frameLength + 2)
+                                if (queueBuffer.Count >= 1 + 1 + _frameLength + 2)
                                 {
                                     //将有效长度的数据保存起来
-                                    byte[] frameBuffer = new byte[1 + 1 + frameLength + 2];
+                                    byte[] frameBuffer = new byte[1 + 1 + _frameLength + 2];
                                     Array.Copy(
                                         queueBuffer.ToArray(),
                                         0,
@@ -291,11 +291,11 @@ namespace SerialProtAssistant2
 
                                     //数据解析完后，将这一帧数据全部出列，将帧头重新标记为false
                                     //然后匹配到正确的帧头，接着解析下一帧数据
-                                    for (int i = 0; i < 1 + 1 + frameLength + 2; i++)
+                                    for (int i = 0; i < 1 + 1 + _frameLength + 2; i++)
                                     {
                                         queueBuffer.Dequeue();
                                     }
-                                    isFramHead = false;
+                                    _isFramHead = false;
                                 }
                                 else
                                 {
@@ -345,14 +345,14 @@ namespace SerialProtAssistant2
 
         private void btn_rec_stop_Click(object sender, EventArgs e)
         {
-            if (isStopRec)
+            if (_isStopRec)
             {
-                isStopRec = false;
+                _isStopRec = false;
                 btn_rec_stop.Text = "恢复";
             }
             else
             {
-                isStopRec = true;
+                _isStopRec = true;
                 btn_rec_stop.Text = "暂停";
             }
         }
@@ -381,7 +381,7 @@ namespace SerialProtAssistant2
             recBuffer.Clear();
             rtxt_rec.Text = "";
             status_rec_count.Text = "0";
-            recCount = 0;
+            _recCount = 0;
         }
 
         /// <summary>
@@ -424,7 +424,7 @@ namespace SerialProtAssistant2
         {
             //界面显示已接收的数据量
             status_rec_count.Text = "0";
-            recCount = 0;
+            _recCount = 0;
         }
 
         /// <summary>
@@ -473,7 +473,7 @@ namespace SerialProtAssistant2
         private void btn_send_clear_Click(object sender, EventArgs e)
         {
             sendBuffer.Clear();
-            sendCount = 0;
+            _sendCount = 0;
             status_send_count.Text = "0";
             rtxt_send.Text = "";
         }
